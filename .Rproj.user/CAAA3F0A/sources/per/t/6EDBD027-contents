@@ -1,0 +1,79 @@
+rm(list = ls())
+
+#Pacotes Utilizados
+library(tidyverse)
+library(tsibble)
+library(jsonlite)
+library(lubridate)
+library(glue)
+library(ggthemes)
+library(deflateBR)
+
+#Funcao para puxar os dados do SGS e ja converte em data e numero e objeto tsibble
+dados_ts <- function(codigo,inicio,fim){
+  api = fromJSON(glue("http://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados?formato=json&dataInicial={inicio}&dataFinal={fim}"))
+  api = api %>% 
+    mutate(valor = as.numeric(valor)) %>% 
+    mutate(data = as.Date(data, format = "%d/%m/%Y"))
+  api_ts = tsibble(
+    Ano = yearmonth(api$data),
+    Valor = api$valor,
+    index = Ano
+  )
+  return(api_ts)
+}
+
+ipca_ts <- dados_ts(433, "01/01/2015", "01/06/2022")
+igpdi_ts <- dados_ts(190,"01/01/2015", "01/06/2022")
+cambio_ts <- dados_ts(20360, "01/01/2015", "01/06/2022")
+selic_ts <- dados_ts(4390, "01/01/2015", "01/06/2022")
+pib_ts <- dados_ts(4380, "01/01/2015", "01/06/2022")
+
+### Fonte LATEX ####
+#windowsFonts(
+#  LMR = windowsFont("LMRoman10-Regular")
+#)
+#########
+
+#Função do plot das variaveis
+plot_dados_ts <- function(ts){
+  ts %>% 
+    ggplot(aes(x = Ano, y = Valor)) +
+    #geom_point() +
+    #geom_smooth(method = "lm", se = FALSE) +
+    geom_line(colour = "#008FD5") +
+    scale_x_yearmonth(date_breaks = "1 year", date_labels = "%Y")
+  #labs(
+  #title = "PIB Real Brasil 01/2000 a 01/2021",
+  #  x = "Mês/Ano",
+  #  y = "PIB Real em R$"
+  #) +
+  #theme(text = element_text(family = "LMR", size = 20)) +
+  #ggtitle("Índice de preços ao consumidor amplo, 2015 a 2022") +
+  #theme_fivethirtyeight() + 
+  #scale_color_fivethirtyeight('cyl') +
+  #ggsave("texte1.svg")
+  
+}
+
+plot_dados_ts(ipca_ts)
+plot_dados_ts(igpdi_ts)
+plot_dados_ts(cambio_ts)
+plot_dados_ts(selic_ts)
+plot_dados_ts(pib_ts)
+
+
+dados <- function(codigo,inicio,fim){
+  api = fromJSON(glue("http://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados?formato=json&dataInicial={inicio}&dataFinal={fim}"))
+  api = api %>% 
+    mutate(valor = as.numeric(valor)) %>% 
+    mutate(data = as.Date(data, format = "%d/%m/%Y"))
+  return(api)
+}
+
+pib <- dados(4380, "01/01/2015", "01/06/2022")
+class(pib$data)
+
+pib_deflate <- pib %>% 
+  mutate(valor_corrente = deflate(valor, data, "06/2022", "igpdi"))
+
